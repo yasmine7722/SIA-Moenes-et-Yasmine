@@ -1,0 +1,62 @@
+#include <stdio.h>
+#include <webots/robot.h>
+#include <webots/motor.h>
+#include <webots/light_sensor.h>
+
+#define NUM_SENSORS 5
+#define MAX_SPEED 10.0
+#define BASE_SPEED 5.0
+#define Kp 0.5
+
+static WbDeviceTag sensors[NUM_SENSORS], left_motor, right_motor;
+static int time_step = 0;
+
+static void initialize() {
+  wb_robot_init();
+  time_step = wb_robot_get_basic_time_step();
+
+  char sensor_name[7];
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    sprintf(sensor_name, "ls%d", i);
+    sensors[i] = wb_robot_get_device(sensor_name);
+    wb_light_sensor_enable(sensors[i], time_step);
+  }
+
+  left_motor = wb_robot_get_device("left wheel motor");
+  right_motor = wb_robot_get_device("right wheel motor");
+  wb_motor_set_position(left_motor, INFINITY);
+  wb_motor_set_position(right_motor, INFINITY);
+}
+
+int main() {
+  initialize();
+
+  while (wb_robot_step(time_step) != -1) {
+    double sensor_values[NUM_SENSORS];
+
+    // Lire les valeurs des capteurs de lumière
+    for (int i = 0; i < NUM_SENSORS; i++) {
+      sensor_values[i] = wb_light_sensor_get_value(sensors[i]);
+    }
+
+    // Suivi de ligne simple
+    double error = 0;
+    for (int i = 0; i < NUM_SENSORS; i++) {
+      error += (i - (NUM_SENSORS - 1) / 2) * sensor_values[i];
+    }
+
+    // Ajustement des vitesses des moteurs en fonction de l'erreur
+    double left_speed = BASE_SPEED + Kp * error;
+    double right_speed = BASE_SPEED - Kp * error;
+
+    // Limiter les vitesses pour éviter d'aller trop vite
+    left_speed = (left_speed > MAX_SPEED) ? MAX_SPEED : left_speed;
+    right_speed = (right_speed > MAX_SPEED) ? MAX_SPEED : right_speed;
+
+    // Réglez les vitesses des moteurs
+    wb_motor_set_velocity(left_motor, left_speed);
+    wb_motor_set_velocity(right_motor, right_speed);
+  }
+
+  return 0;
+}

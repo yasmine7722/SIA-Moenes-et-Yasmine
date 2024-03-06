@@ -1,0 +1,78 @@
+#include <math.h>
+
+// Define the neural network parameters
+#define INPUT_SIZE num_sensors
+#define HIDDEN_SIZE 8
+#define OUTPUT_SIZE 2
+
+// Neural network weights
+double input_hidden_weights[INPUT_SIZE][HIDDEN_SIZE];
+double hidden_output_weights[HIDDEN_SIZE][OUTPUT_SIZE];
+
+// Sigmoid activation function
+double sigmoid(double x) {
+    return 1.0 / (1.0 + exp(-x));
+}
+
+// Initialize neural network weights
+void initialize_neural_network() {
+    // Initialize input to hidden weights
+    for (int i = 0; i < INPUT_SIZE; i++) {
+        for (int j = 0; j < HIDDEN_SIZE; j++) {
+            input_hidden_weights[i][j] = (rand() % 2000 - 1000) / 1000.0; // Initialize with random values between -1 and 1
+        }
+    }
+
+    // Initialize hidden to output weights
+    for (int i = 0; i < HIDDEN_SIZE; i++) {
+        for (int j = 0; j < OUTPUT_SIZE; j++) {
+            hidden_output_weights[i][j] = (rand() % 2000 - 1000) / 1000.0; // Initialize with random values between -1 and 1
+        }
+    }
+}
+
+// Neural network forward pass
+void neural_network_forward(double sensors_value[], double motor_speed[]) {
+    // Compute hidden layer activations
+    double hidden[HIDDEN_SIZE];
+    for (int i = 0; i < HIDDEN_SIZE; i++) {
+        hidden[i] = 0.0;
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            hidden[i] += sensors_value[j] * input_hidden_weights[j][i];
+        }
+        hidden[i] = sigmoid(hidden[i]);
+    }
+
+    // Compute output layer activations
+    for (int i = 0; i < OUTPUT_SIZE; i++) {
+        motor_speed[i] = 0.0;
+        for (int j = 0; j < HIDDEN_SIZE; j++) {
+            motor_speed[i] += hidden[j] * hidden_output_weights[j][i];
+        }
+        motor_speed[i] = sigmoid(motor_speed[i]);
+    }
+}
+
+int main() {
+    initialize();
+    initialize_neural_network();
+
+    while (wb_robot_step(time_step) != -1) {
+        double sensors_value[MAX_SENSOR_NUMBER];
+        double motor_speed[2];
+
+        // Read sensor values
+        for (int i = 0; i < num_sensors; i++) {
+            sensors_value[i] = wb_distance_sensor_get_value(sensors[i]) / range; // Normalize sensor values to [0, 1]
+        }
+
+        // Run the neural network forward pass
+        neural_network_forward(sensors_value, motor_speed);
+
+        // Set the motor speeds
+        wb_motor_set_velocity(left_motor, max_speed * (motor_speed[0] * 2 - 1)); // Scale to [-max_speed, max_speed]
+        wb_motor_set_velocity(right_motor, max_speed * (motor_speed[1] * 2 - 1));
+    }
+
+    return 0;
+}

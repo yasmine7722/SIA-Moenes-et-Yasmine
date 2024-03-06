@@ -1,0 +1,87 @@
+#include <stdio.h>
+#include <stdbool.h>
+#include <webots/robot.h>
+#include <webots/motor.h>
+#include <webots/distance_sensor.h>
+
+#define MAX_SENSOR_NUMBER 16
+#define RANGE (1024 / 2)
+
+static WbDeviceTag sensors[MAX_SENSOR_NUMBER], left_motor, right_motor;
+static int num_sensors;
+static double range;
+static int time_step = 0;
+static double max_speed = 5.0;
+
+// Function to detect obstacles
+bool detect_obstacle() {
+    
+    for (int i = 0; i < num_sensors; i++) {
+        if (wb_distance_sensor_get_value(sensors[i]) > 0.8 * RANGE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// State machine states
+typedef enum {
+    AVOIDANCE,
+    STRAIGHT
+} State;
+
+// State machine transition function
+State transition(State current_state) {
+    switch (current_state) {
+        case AVOIDANCE:
+            if (!detect_obstacle()) {
+                return STRAIGHT;
+            }
+            break;
+
+        case STRAIGHT:
+            if (detect_obstacle()) {
+                return AVOIDANCE;
+            }
+            break;
+    }
+
+    return current_state;
+}
+
+// State machine action function
+void action(State current_state) {
+    switch (current_state) {
+        case AVOIDANCE:
+            
+           
+            wb_motor_set_velocity(left_motor, max_speed);
+            wb_motor_set_velocity(right_motor, -max_speed);
+            break;
+
+        case STRAIGHT:
+            // Move straight
+            wb_motor_set_velocity(left_motor, max_speed);
+            wb_motor_set_velocity(right_motor, max_speed);
+            break;
+    }
+}
+
+int main() {
+    wb_robot_init();
+    time_step = wb_robot_get_basic_time_step();
+
+   
+    State current_state = STRAIGHT;
+
+    while (wb_robot_step(time_step) != -1) {
+        // Perform state transition
+        current_state = transition(current_state);
+
+        // Perform action based on the current state
+        action(current_state);
+    }
+
+    wb_robot_cleanup();
+    return 0;
+}
